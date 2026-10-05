@@ -1,3 +1,54 @@
+# slidesme
+
+A fork of [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo) (MIT). Everything upstream still works, including the full short-video pipeline. This fork adds **viral photo-carousel / slideshow generation**, the swipeable slides you see on TikTok photo mode, Instagram and LinkedIn.
+
+## Slideshow generator
+
+Give it a topic and it produces the following:
+
+1. **Script.** The configured LLM writes a carousel: a scroll-stopping *hook* slide, one idea per *value* slide, and a *CTA* slide ("Save this / follow for part 2"). It also writes a post caption and hashtags.
+2. **Backgrounds.** Each slide gets a stock photo from Pexels or Pixabay, using the same API keys as the video pipeline. You can also upload your own images or use gradients, which need no keys.
+3. **Render.** Each slide is rendered to PNG in one of four looks:
+   - `tiktok`: white outlined text over a darkened photo
+   - `highlight`: text on white/black boxes, like TikTok's highlight text
+   - `bold`: uppercase headline over a dark bottom gradient with an accent colour
+   - `minimal`: no photo, a dark tweet/thread-style canvas
+4. **Export.** You get `slide-01.png …`, `slides.zip` (with `caption.txt`), and optionally an `slideshow.mp4` with fades and background music for Reels/Shorts.
+
+Sizes: `4:5` (1080×1350, Instagram/LinkedIn), `9:16` (1080×1920, TikTok/Reels), `1:1`.
+
+### WebUI
+
+Run `./webui.sh` (or `webui.bat`) as usual and open the **Slideshow** page in the sidebar. Set up the LLM and Pexels/Pixabay keys on the main page first. Flow: **Write slides**, edit the text in the table, then **Render slideshow** and download.
+
+### CLI
+
+```bash
+uv run python slideshow_cli.py "7 habits that quietly wreck your sleep"
+uv run python slideshow_cli.py "budget travel hacks" --style bold --aspect 9:16 --video --handle mytravels
+uv run python slideshow_cli.py "gym tips" --images none --script-file my_slides.json   # skip the LLM
+```
+
+Output goes to `storage/tasks/<task_id>/`. Run `--help` for all options.
+
+### API
+
+```bash
+curl -X POST http://127.0.0.1:8080/api/v1/slideshows \
+  -H 'Content-Type: application/json' \
+  -d '{"topic": "5 money habits that changed my life", "style": "tiktok", "aspect": "4:5", "slide_count": 7}'
+# -> {"data": {"task_id": "..."}}
+curl http://127.0.0.1:8080/api/v1/tasks/<task_id>   # images / zip_file / video_file URLs once state == 1
+```
+
+Request fields are defined in `app/models/slideshow.py` (`SlideshowParams`). Pass `script` to render your own slides without calling the LLM.
+
+> Notes: emoji are stripped from the slide text because the bundled fonts have no emoji glyphs; they stay in the caption. CJK text automatically switches to a CJK font.
+
+---
+
+*Original MoneyPrinterTurbo README follows.*
+
 <div align="center">
 
 # MoneyPrinterTurbo 💸
