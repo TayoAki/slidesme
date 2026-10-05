@@ -82,6 +82,10 @@ st.set_page_config(
     },
 )
 
+from app.utils.webui_auth import require_password  # noqa: E402
+
+require_password()
+
 
 # Streamlit 1.59 会在页面右上角默认展示 Deploy、skills nudge 等平台入口。
 # MoneyPrinterTurbo 是面向终端用户的本地工具，这些入口会造成顶部大块空白，

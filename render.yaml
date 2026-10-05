@@ -1,0 +1,22 @@
+# One-click Render blueprint (alternative to Railway). Secrets are entered in the Render dashboard.
+services:
+  - type: web
+    name: slidesme
+    runtime: docker
+    dockerfilePath: ./Dockerfile.slidesme
+    plan: starter
+    disk:
+      name: storage
+      mountPath: /app/storage
+      sizeGB: 1
+    envVars:
+      - key: APP_PASSWORD
+        sync: false
+      - key: SCRAPECREATORS_API_KEY
+        sync: false
+      - key: LLM_PROVIDER
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: PEXELS_API_KEY
+        sync: false

@@ -1,49 +1,49 @@
 # slidesme
 
-A fork of [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo) (MIT). Everything upstream still works, including the full short-video pipeline. This fork adds **viral photo-carousel / slideshow generation**, the swipeable slides you see on TikTok photo mode, Instagram and LinkedIn.
+A fork of [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo) (MIT). Everything upstream still works, including the full short-video pipeline. This fork adds **viral photo-carousel / slideshow generation**: find carousels that already perform, turn them into reusable templates, and have AI write new ones in that format with real photographs.
 
 ## Slideshow generator
 
-Give it a topic and it produces the following:
+The workflow is: **start from a format that already works → turn it into a reusable template → let AI write a new carousel in that format with real photos.**
 
-1. **Script.** The configured LLM writes a carousel: a scroll-stopping *hook* slide, one idea per *value* slide, and a *CTA* slide ("Save this / follow for part 2"). It also writes a post caption and hashtags.
-2. **Backgrounds.** Each slide gets a stock photo from Pexels or Pixabay, using the same API keys as the video pipeline. You can also upload your own images or use gradients, which need no keys.
-3. **Render.** Each slide is rendered to PNG in one of four looks:
-   - `tiktok`: white outlined text over a darkened photo
-   - `highlight`: text on white/black boxes, like TikTok's highlight text
-   - `bold`: uppercase headline over a dark bottom gradient with an accent colour
-   - `minimal`: no photo, a dark tweet/thread-style canvas
-4. **Export.** You get `slide-01.png …`, `slides.zip` (with `caption.txt`), and optionally an `slideshow.mp4` with fades and background music for Reels/Shorts.
+1. **Find winners** (Scrape Creators). Search TikTok's *Top* results by keyword, list a creator's carousels, or paste a carousel URL. Results are photo carousels only, ranked by reach weighted toward **saves and shares**: the "people kept this" signal.
+2. **Make a template.** Each slide is read with on-device OCR (RapidOCR; images never leave the server). The template stores:
+   - the slide-by-slide text and role of each slide (hook / numbered item / product plug / CTA);
+   - where the text sits, how big it is, and how dark the photos are;
+   - the hook formula, format notes and a photo "vibe". These are written by your configured LLM, or by heuristics when no LLM is set.
 
-Sizes: `4:5` (1080×1350, Instagram/LinkedIn), `9:16` (1080×1920, TikTok/Reels), `1:1`.
+   Templates are JSON files in `storage/templates/`, editable in the UI. The source photos are only kept as small reference thumbnails and are never reused.
+3. **Create.** Choose a template, enter your topic and, optionally, a product to plug. The AI writes a new carousel with the same number of slides, hook formula, rhythm and voice. A product is mentioned casually where the original had its plug slide. You edit the text, then render:
+   - **Photos:** real photographs from **Openverse** (CC licenses that allow commercial use; no key needed; credits are saved to `credits.txt`), or Pexels/Pixabay with a key, or your own uploads. Each photo is darkened to match the template's mood.
+   - **`native` style:** TikTok Sans (TikTok's open-source typeface, OFL) in white, centred at the template's measured position and size, so slides look like they were made in the TikTok app.
+   - Other styles: `tiktok`, `highlight`, `bold`, `minimal`. Sizes: 9:16, 4:5, 1:1.
+   - **Output:** PNG slides, `slides.zip` (with caption and credits), and an optional MP4.
 
-### WebUI
+### Run it
 
-Run `./webui.sh` (or `webui.bat`) as usual and open the **Slideshow** page in the sidebar. Set up the LLM and Pexels/Pixabay keys on the main page first. Flow: **Write slides**, edit the text in the table, then **Render slideshow** and download.
+- **WebUI:** `./webui.sh`, then open **Slideshow** in the sidebar and use the three tabs. Set your LLM provider/key on the main page, or use env vars (below).
+- **CLI:** run `uv run python slideshow_cli.py "how to stop procrastinating" --from-url https://www.tiktok.com/@user/photo/123 --product "Focusly app"`. Add `--template <id>` to reuse a saved template.
+- **API:**
+  - `GET /api/v1/carousels/search?query=sleep%20tips`
+  - `POST /api/v1/templates {"url": "..."}`
+  - `GET /api/v1/templates`
+  - `POST /api/v1/slideshows {"topic": "...", "template_id": "...", "product": "..."}`, then poll `GET /api/v1/tasks/{id}`
 
-### CLI
+### Configuration (env vars, used by hosted deploys)
 
-```bash
-uv run python slideshow_cli.py "7 habits that quietly wreck your sleep"
-uv run python slideshow_cli.py "budget travel hacks" --style bold --aspect 9:16 --video --handle mytravels
-uv run python slideshow_cli.py "gym tips" --images none --script-file my_slides.json   # skip the LLM
-```
+| Variable | Purpose |
+|---|---|
+| `SCRAPECREATORS_API_KEY` | Finding winning carousels |
+| `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_MODEL` | AI writing, e.g. `gemini` / `openai` / `anthropic` / `openrouter` (any provider MoneyPrinterTurbo supports) |
+| `PEXELS_API_KEY`, `PIXABAY_API_KEY` | Optional extra photo sources (Openverse needs none) |
+| `APP_PASSWORD` | Password-protects the hosted WebUI |
 
-Output goes to `storage/tasks/<task_id>/`. Run `--help` for all options.
+### Deploy
 
-### API
+- **Railway:** `railway.json` builds `Dockerfile.slidesme`. Attach a volume at `/app/storage` so templates survive redeploys.
+- **Render:** `render.yaml` is a blueprint for the same image with a persistent disk.
 
-```bash
-curl -X POST http://127.0.0.1:8080/api/v1/slideshows \
-  -H 'Content-Type: application/json' \
-  -d '{"topic": "5 money habits that changed my life", "style": "tiktok", "aspect": "4:5", "slide_count": 7}'
-# -> {"data": {"task_id": "..."}}
-curl http://127.0.0.1:8080/api/v1/tasks/<task_id>   # images / zip_file / video_file URLs once state == 1
-```
-
-Request fields are defined in `app/models/slideshow.py` (`SlideshowParams`). Pass `script` to render your own slides without calling the LLM.
-
-> Notes: emoji are stripped from the slide text because the bundled fonts have no emoji glyphs; they stay in the caption. CJK text automatically switches to a CJK font.
+> Notes: emoji are stripped from slide text because the fonts have no emoji glyphs; they stay in the caption. Carousel search is TikTok-only for now, since that's where Scrape Creators returns photo carousels with their slides.
 
 ---
 

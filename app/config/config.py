@@ -646,6 +646,32 @@ app["redis_host"] = os.getenv(
     os.getenv("REDIS_HOST", app.get("redis_host", "localhost")),
 )
 
+
+
+def _apply_env_overrides() -> None:
+    """Let hosted deployments (Railway, Render, Docker) configure keys via env vars.
+
+    Only variables that are set override config.toml, so local setups are unchanged.
+    """
+    provider = os.getenv("LLM_PROVIDER", "").strip().lower()
+    if provider:
+        app["llm_provider"] = provider
+    provider = provider or str(app.get("llm_provider", "")).lower()
+    for env_name, suffix in (("LLM_API_KEY", "api_key"), ("LLM_MODEL", "model_name"), ("LLM_BASE_URL", "base_url")):
+        value = os.getenv(env_name, "").strip()
+        if value and provider:
+            app[f"{provider}_{suffix}"] = value
+    for env_name, key in (("PEXELS_API_KEY", "pexels_api_keys"), ("PIXABAY_API_KEY", "pixabay_api_keys")):
+        value = os.getenv(env_name, "").strip()
+        if value:
+            app[key] = [k.strip() for k in value.split(",") if k.strip()]
+    value = os.getenv("SCRAPECREATORS_API_KEY", "").strip()
+    if value:
+        app["scrapecreators_api_key"] = value
+
+
+_apply_env_overrides()
+
 ffmpeg_path = app.get("ffmpeg_path", "")
 if ffmpeg_path and os.path.isfile(ffmpeg_path):
     os.environ["IMAGEIO_FFMPEG_EXE"] = ffmpeg_path

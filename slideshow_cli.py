@@ -37,10 +37,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     p.add_argument("--slides", type=int, default=7, help=f"Number of slides ({MIN_SLIDES}-{MAX_SLIDES})")
     p.add_argument("--language", default="", help="Output language, e.g. en, es, zh-CN (default: topic language)")
     p.add_argument("--tone", default="", help="Extra copywriting instructions, e.g. 'funny, gen-z voice'")
+    p.add_argument("--template", default="", help="Template id (see storage/templates/) to copy the format of")
+    p.add_argument("--from-url", default="", help="Make a template from this TikTok carousel URL first, then use it")
+    p.add_argument("--product", default="", help="Product/app to mention casually, like the template's plug slide")
     p.add_argument("--script-file", help="JSON file with {slides:[{heading,body,image_query}],caption,hashtags}; skips the LLM")
-    p.add_argument("--style", choices=[s.value for s in SlideStyle], default=SlideStyle.tiktok.value)
-    p.add_argument("--aspect", choices=[a.value for a in SlideAspect], default=SlideAspect.portrait_4_5.value)
-    p.add_argument("--images", choices=[s.value for s in SlideImageSource], default=SlideImageSource.pexels.value, help="Background photo source")
+    p.add_argument("--style", choices=[s.value for s in SlideStyle], default=None, help="Default: template's style, else native")
+    p.add_argument("--aspect", choices=[a.value for a in SlideAspect], default=None, help="Default: template's size, else 9:16")
+    p.add_argument("--images", choices=[s.value for s in SlideImageSource], default=SlideImageSource.openverse.value, help="Background photo source")
     p.add_argument("--local-image", action="append", default=[], help="Local background image (repeatable, used in slide order)")
     p.add_argument("--font", default="", help="Font file name inside resource/fonts")
     p.add_argument("--accent", default="#FFD400", help="Accent colour for the 'bold' style")
@@ -63,19 +66,28 @@ def run(argv: Sequence[str] | None = None) -> int:
     from app.services import slideshow
     from app.utils import utils
 
+    template_id = args.template
+    if args.from_url:
+        from app.services import carousel_template, scrapecreators
+
+        template_id = carousel_template.create_template(scrapecreators.get_carousel(args.from_url)).id
+        print(f"created template {template_id}", file=sys.stderr)
+
     script = None
     if args.script_file:
         with open(args.script_file, encoding="utf-8") as f:
             script = SlideshowScript.model_validate(json.load(f))
 
+    explicit = {k: v for k, v in (("style", args.style), ("aspect", args.aspect)) if v}
     params = SlideshowParams(
+        **explicit,
+        template_id=template_id,
+        product=args.product,
         topic=args.topic,
         language=args.language,
         slide_count=args.slides,
         tone=args.tone,
         script=script,
-        aspect=args.aspect,
-        style=args.style,
         image_source=args.images,
         font_name=args.font,
         accent_color=args.accent,

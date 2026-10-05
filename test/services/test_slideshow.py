@@ -121,7 +121,7 @@ class TestSlideshowRendering(unittest.TestCase):
                     self.assertEqual(image.size, aspect.to_resolution())
 
     def test_generate_writes_pngs_zip_and_caption(self):
-        params = SlideshowParams(topic="sleep", script=SCRIPT, image_source="none")
+        params = SlideshowParams(topic="sleep", script=SCRIPT, image_source="none", aspect="4:5")
         with patch.object(slideshow, "generate_slideshow_script") as gen:
             result = slideshow.generate(self.task_id, params)
         gen.assert_not_called()
@@ -146,7 +146,7 @@ class TestSlideshowRendering(unittest.TestCase):
         local = os.path.join(utils.task_dir(self.task_id), "bg.jpg")
         Image.new("RGB", (900, 1600), (255, 0, 0)).save(local)
         params = SlideshowParams(topic="t", script=SCRIPT, style="highlight", image_source="pexels")
-        with patch.object(slideshow, "fetch_background", return_value=None) as fetch:
+        with patch.object(slideshow, "fetch_background", return_value=(None, "")) as fetch:
             result = slideshow.generate(self.task_id, params, local_images=[local])
         # Slide 1 used the local image, the remaining two went to stock search.
         self.assertEqual(fetch.call_count, 2)
